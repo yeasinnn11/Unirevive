@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unirevive | Circular Fashion Economy</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-storage-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-functions-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-analytics-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-messaging-compat.js"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #6B73FF 0%, #000DFF 100%);
+        }
+        .circular-progress {
+            position: relative;
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: conic-gradient(#4F46E5 0% 70%, #E5E7EB 70% 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .circular-progress::before {
+            content: "";
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: white;
+        }
+        .item-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .nav-indicator {
+            transition: all 0.3s ease;
+        }
+        .nav-indicator.active {
+            width: 24px;
+            background-color: #4F46E5;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .map-container {
+            height: 200px;
+            width: 100%;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "unirevive-app.firebaseapp.com",
+            projectId: "unirevive-app",
+            storageBucket: "unirevive-app.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID",
+            measurementId: "YOUR_MEASUREMENT_ID"
+        };
+        
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const storage = firebase.storage();
+        const functions = firebase.functions();
+        const analytics = firebase.analytics();
+        const messaging = firebase.messaging();
+
+        // Main App Component
+        function App() {
+            const [activeTab, setActiveTab] = useState('home');
+            const [showAuthModal, setShowAuthModal] = useState(false);
+            const [showQrScanner, setShowQrScanner] = useState(false);
+            const [showUpcyclingModal, setShowUpcyclingModal] = useState(false);
+            const [showListingModal, setShowListingModal] = useState(false);
+            const [showBrandDashboard, setShowBrandDashboard] = useState(false);
+            const [showPlaygroundModal, setShowPlaygroundModal] = useState(false);
+            const [authMode, setAuthMode] = useState('signin');
+            const [disposition, setDisposition] = useState(null);
+            const [showUpcyclingResults, setShowUpcyclingResults] = useState(false);
+
+            // Sample data
+            const [listings] = useState([
+                {
+                    id: 1,
+                    title: "Vintage Denim Jacket",
+                    distance: "2.3km away",
+                    price: "$24.99",
+                    type: "Donate",
+                    image: "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=500&q=80"
+                },
+                {
+                    id: 2,
+                    title: "Leather Handbag",
+                    distance: "1.1km away",
+                    price: "$45.00",
+                    type: "Resell",
+                    image: "https://images.unsplash.com/photo-1525507119028-ed4c629a60a3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=500&q=80"
+                },
+                {
+                    id: 3,
+                    title: "Silk Blouse",
+                    distance: "3.5km away",
+                    price: "$18.50",
+                    type: "Recycle",
+                    image: "https://images.unsplash.com/photo-1543076449-ae0315e8d8e1?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=500&q=80"
+                },
+                {
+                    id: 4,
+                    title: "Wool Sweater",
+                    distance: "4.2km away",
+                    price: "$32.00",
+                    type: "Donate",
+                    image: "https://images.unsplash.com/photo-1551232864-3f0890e580d9?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=500&q=80"
+                }
+            ]);
+
+            const [rewards] = useState([
+                {
+                    id: 1,
+                    title: "Coffee Voucher",
+                    description: "Local sustainable cafe",
+                    icon: "fa-coffee",
+                    color: "yellow",
+                    points: "500 pts"
+                },
+                {
+                    id: 2,
+                    title: "Eco Bag",
+                    description: "Reusable shopping bag",
+                    icon: "fa-leaf",
+                    color: "green",
+                    points: "750 pts"
+                },
+                {
+                    id: 3,
+                    title: "Event Ticket",
+                    description: "Sustainable fashion talk",
+                    icon: "fa-ticket-alt",
+                    color: "blue",
+                    points: "1,000 pts"
+                },
+                {
+                    id: 4,
+                    title: "Discount Code",
+                    description: "20% off ethical brands",
+                    icon: "fa-percent",
+                    color: "indigo",
+                    points: "300 pts"
+                }
+            ]);
+
+            const [playgrounds] = useState([
+                {
+                    id: 1,
+                    name: "EcoKids Playland",
+                    distance: "1.2km away",
+                    materials: "85% upcycled textiles",
+                    rating: "4.8",
+                    reviews: "24 reviews",
+                    image: "https://images.unsplash.com/photo-1542843175-ec5d47a574bc?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=500&q=80"
+                },
+                {
+                    id: 2,
+                    name: "Green Sprouts Center",
+                    distance: "2.5km away",
+                    materials: "92% upcycled textiles",
+                    rating: "4.9",
+                    reviews: "37 reviews",
+                    image: "https://images.unsplash.com/photo-1608889825101-1d42c8c4d53c?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=500&q=80"
+                },
+                {
+                    id: 3,
+                    name: "Tiny Footprints Club",
+                    distance: "3.8km away",
+                    materials: "78% upcycled textiles",
+                    rating: "4.7",
+                    reviews: "19 reviews",
+                    image: "https://images.unsplash.com/photo-1608889825205-e8dbd6c0bb6a?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=500&q=80"
+                }
+            ]);
+
+            const handleTabChange = (tab) => {
+                setActiveTab(tab);
+            };
+
+            const handleDispositionSelect = (type) => {
+                setDisposition(type);
+            };
+
+            const generateIdeas = () => {
+                setShowUpcyclingResults(true);
+            };
+
+            return (
+                <div className="max-w-md mx-auto bg-white min-h-screen shadow-lg overflow-hidden">
+                    {/* Header */}
+                    <Header 
+                        onAuthClick={() => setShowAuthModal(true)}
+                        onQrClick={() => setShowQrScanner(true)}
+                    />
+                    
+                    {/* Main Content */}
+                    <main className="pb-20">
+                        {/* Tab Navigation */}
+                        <TabNavigation 
+                            activeTab={activeTab}
+                            onTabChange={handleTabChange}
+                        />
+                        
+                        {/* Tab Contents */}
+                        <div className="tab-contents">
+                            {/* Home Tab */}
+                            {activeTab === 'home' && (
+                                <HomeTab 
+                                    onAddListing={() => setShowListingModal(true)}
+                                    onScanQr={() => setShowQrScanner(true)}
+                                    onUpcycleIdeas={() => setShowUpcyclingModal(true)}
+                                    onViewBrandDashboard={() => setShowBrandDashboard(true)}
+                                    onViewPlaygrounds={() => setShowPlaygroundModal(true)}
+                                />
+                            )}
+                            
+                            {/* Listings Tab */}
+                            {activeTab === 'listings' && (
+                                <ListingsTab 
+                                    listings={listings}
+                                    onUpcycleIdeas={() => setShowUpcyclingModal(true)}
+                                />
+                            )}
+                            
+                            {/* Rewards Tab */}
+                            {activeTab === 'rewards' && (
+                                <RewardsTab 
+                                    rewards={rewards}
+                                />
+                            )}
+                        </div>
+                    </main>
+
+                    {/* Bottom Navigation */}
+                    <BottomNavigation 
+                        activeTab={activeTab}
+                        onTabChange={handleTabChange}
+                    />
+                    
+                    {/* Modals */}
+                    <AuthModal 
+                        show={showAuthModal}
+                        mode={authMode}
+                        onClose={() => setShowAuthModal(false)}
+                        onSwitchMode={() => setAuthMode(authMode === 'signin' ? 'signup' : 'signin')}
+                    />
+                    
+                    <QrScannerModal 
+                        show={showQrScanner}
+                        onClose={() => setShowQrScanner(false)}
+                    />
+                    
+                    <UpcyclingModal 
+                        show={showUpcyclingModal}
+                        showResults={showUpcyclingResults}
+                        onClose={() => {
+                            setShowUpcyclingModal(false);
+                            setShowUpcyclingResults(false);
+                        }}
+                        onGenerateIdeas={generateIdeas}
+                    />
+                    
+                    <AddListingModal 
+                        show={showListingModal}
+                        disposition={disposition}
+                        onClose={() => {
+                            setShowListingModal(false);
+                            setDisposition(null);
+                        }}
+                        onDispositionSelect={handleDispositionSelect}
+                    />
+                    
+                    <BrandDashboardModal 
+                        show={showBrandDashboard}
+                        onClose={() => setShowBrandDashboard(false)}
+                    />
+                    
+                    <PlaygroundModal 
+                        show={showPlaygroundModal}
+                        playgrounds={playgrounds}
+                        onClose={() => setShowPlaygroundModal(false)}
+                    />
+                </div>
+            );
+        }
+
+        // Header Component
+        function Header({ onAuthClick, onQrClick }) {
+            return (
+                <header className="gradient-bg text-white p-4">
+                    <div className="flex justify-between items-center">
+                        <div className="flex items-center space-x-2">
+                            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center">
+                                <i className="fas fa-recycle text-indigo-600 text-xl"></i>
+                            </div>
+                            <h1 className="text-xl font-bold">Unirevive</h1>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                            <button onClick={onQrClick} className="p-2 bg-white bg-opacity-20 rounded-full">
+                                <i className="fas fa-qrcode"></i>
+                            </button>
+                            <button onClick={onAuthClick} className="p-2 bg-white bg-opacity-20 rounded-full">
+                                <i className="fas fa-user"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div className="mt-6 relative">
+                        <input type="text" placeholder="Search for items or brands..." className="w-full py-3 px-4 pr-10 rounded-lg bg-white bg-opacity-20 placeholder-white focus:outline-none focus:ring-2 focus:ring-white" />
+                        <i className="fas fa-search absolute right-4 top-3.5 text-white"></i>
+                    </div>
+                </header>
+            );
+        }
+
+        // Tab Navigation Component
+        function TabNavigation({ activeTab, onTabChange }) {
+            return (
+                <div className="flex justify-around border-b border-gray-200">
+                    {['home', 'listings', 'rewards'].map((tab) => (
+                        <button 
+                            key={tab}
+                            onClick={() => onTabChange(tab)}
+                            className={`py-4 px-6 flex flex-col items-center relative ${activeTab === tab ? 'text-indigo-600' : ''}`}
+                        >
+                            <i className={`fas fa-${tab === 'home' ? 'home' : tab === 'listings' ? 'tshirt' : 'gem'} ${activeTab === tab ? 'text-indigo-600' : 'text-gray-500'} mb-1`}></i>
+                            <span className={`text-xs ${activeTab === tab ? 'text-indigo-600' : 'text-gray-500'}`}>
+                                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                            </span>
+                            <div className={`nav-indicator absolute bottom-0 h-1 rounded-full ${activeTab === tab ? 'active' : ''}`}></div>
+                        </button>
+                    ))}
+                </div>
+            );
+        }
+
+        // Home Tab Component
+        function HomeTab({ onAddListing, onScanQr, onUpcycleIdeas, onViewBrandDashboard, onViewPlaygrounds }) {
+            return (
+                <div className="p-4">
+                    <h2 className="text-lg font-semibold mb-4">Today's Highlights</h2>
+                    
+                    {/* Stats Card */}
+                    <div className="bg-indigo-50 rounded-xl p-4 mb-6">
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <p className="text-sm text-indigo-700">Your Circular Impact</p>
+                                <h3 className="text-2xl font-bold text-indigo-900">12 items</h3>
+                                <p className="text-xs text-indigo-600">saved from landfills</p>
+                            </div>
+                            <div className="circular-progress">
+                                <span className="text-indigo-900 font-bold text-lg relative">70%</span>
+                            </div>
+                        </div>
+                        <div className="mt-4 flex justify-between text-xs text-indigo-700">
+                            <span>♻️ 5 recycled</span>
+                            <span>🔄 4 resold</span>
+                            <span>🎁 3 donated</span>
+                        </div>
+                    </div>
+                    
+                    {/* Quick Actions */}
+                    <div className="grid grid-cols-3 gap-3 mb-6">
+                        <button onClick={onAddListing} className="bg-white border border-gray-200 rounded-lg p-3 flex flex-col items-center justify-center hover:bg-gray-50">
+                            <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center mb-2">
+                                <i className="fas fa-plus text-indigo-600"></i>
+                            </div>
+                            <span className="text-xs text-center">Add Listing</span>
+                        </button>
+                        <button onClick={onScanQr} className="bg-white border border-gray-200 rounded-lg p-3 flex flex-col items-center justify-center hover:bg-gray-50">
+                            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mb-2">
+                                <i className="fas fa-qrcode text-green-600"></i>
+                            </div>
+                            <span className="text-xs text-center">Scan QR</span>
+                        </button>
+                        <button onClick={onUpcycleIdeas} className="bg-white border border-gray-200 rounded-lg p-3 flex flex-col items-center justify-center hover:bg-gray-50">
+                            <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center mb-2">
+                                <i className="fas fa-lightbulb text-purple-600"></i>
+                            </div>
+                            <span className="text-xs text-center">Upcycle Ideas</span>
+                        </button>
+                    </div>
+                    
+                    {/* Brand Partner Section */}
+                    <div className="bg-white rounded-xl p-4 mb-6 shadow-sm border border-gray-100">
+                        <div className="flex items-center justify-between mb-3">
+                            <h3 className="font-medium">Brand Partners</h3>
+                            <button onClick={onViewBrandDashboard} className="text-xs text-indigo-600 hover:underline">View Dashboard</button>
+                        </div>
+                        <div className="flex items-center space-x-4 overflow-x-auto pb-2">
+                            <div className="flex-shrink-0 w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center overflow-hidden">
+                                <img src="https://logo.clearbit.com/patagonia.com" className="w-full h-full object-cover" alt="Patagonia" />
+                            </div>
+                            <div className="flex-shrink-0 w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center overflow-hidden">
+                                <img src="https://logo.clearbit.com/everlane.com" className="w-full h-full object-cover" alt="Everlane" />
+                            </div>
+                            <div className="flex-shrink-0 w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center overflow-hidden">
+                                <img src="https://logo.clearbit.com/reformation.com" className="w-full h-full object-cover" alt="Reformation" />
+                            </div>
+                            <div className="flex-shrink-0 w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center overflow-hidden">
+                                <img src="https://logo.clearbit.com/levi.com" className="w-full h-full object-cover" alt="Levi's" />
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {/* Playground Section */}
+                    <div className="bg-white rounded-xl p-4 mb-6 shadow-sm border border-gray-100">
+                        <div className="flex items-center justify-between mb-3">
+                            <h3 className="font-medium">Soft Playgrounds Nearby</h3>
+                            <button onClick={onViewPlaygrounds} className="text-xs text-indigo-600 hover:underline">See All</button>
+                        </div>
+                        <div className="aspect-video bg-gray-200 rounded-lg mb-3 relative overflow-hidden">
+                            <img src="https://images.unsplash.com/photo-1542843175-ec5d47a574bc?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80" className="w-full h-full object-cover" alt="Playground" />
+                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-4 text-white">
+                                <h4 className="font-medium">EcoKids Playland</h4>
+                                <p className="text-xs">1.2km away • 85% upcycled materials</p>
+                            </div>
+                        </div>
+                        <button onClick={onViewPlaygrounds} className="w-full bg-indigo-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-indigo-700">
+                            Find Nearest Playground
+                        </button>
+                    </div>
+                    
+                    {/* Social Feed */}
+                    <h3 className="text-lg font-semibold mb-3">Community Creations</h3>
+                    <div className="space-y-4">
+                        {/* Post 1 */}
+                        <div className="bg-white rounded-xl overflow-hidden shadow-sm border border-gray-100">
+                            <div className="p-4">
+                                <div className="flex items-center space-x-3 mb-3">
+                                    <div className="w-10 h-10 bg-pink-100 rounded-full flex items-center justify-center">
+                                        <i className="fas fa-user text-pink-500"></i>
+                                    </div>
+                                    <div>
+                                        <h4 className="font-medium">Sarah K.</h4>
+                                        <p className="text-xs text-gray-500">2 hours ago</p>
+                                    </div>
+                                </div>
+                                <p className="mb-3">Turned my old jeans into this cute tote bag! #upcycled #DIY</p>
+                                <div className="grid grid-cols-2 gap-2 mb-3">
+                                    <div className="aspect-square bg-gray-200 rounded-lg overflow-hidden">
+                                        <img src="https://images.unsplash.com/photo-1560884296-657d8c5b90b3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=500&q=80" className="w-full h-full object-cover" alt="DIY Project" />
+                                    </div>
+                                    <div className="aspect-square bg-gray-200 rounded-lg overflow-hidden">
+                                        <img src="https://images.unsplash.com/photo-1563170351-82d9d38a6f7a?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=500&q=80" className="w-full h-full object-cover" alt="DIY Project" />
+                                    </div>
+                                </div>
+                                <div className="flex justify-between text-sm text-gray-500">
+                                    <button className="flex items-center space-x-1">
+                                        <i className="far fa-heart"></i>
+                                        <span>24</span>
+                                    </button>
+                                    <button className="flex items-center space-x-1">
+                                        <i className="far fa-comment"></i>
+                                        <span>5</span>
+                                    </button>
+                                    <button className="flex items-center space-x-1">
+                                        <i className="fas fa-share"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* Post 2 */}
+                        <div className="bg-white rounded-xl overflow-hidden shadow-sm border border-gray-100">
+                            <div className="p-4">
+                                <div className="flex items-center space-x-3 mb-3">
+                                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                        <i className="fas fa-user text-blue-500"></i>
+                                    </div>
+                                    <div>
+                                        <h4 className="font-medium">Mike T.</h4>
+                                        <p className="text-xs text-gray-500">1 day ago</p>
+                                    </div>
+                                </div>
+                                <p className="mb-3">Found this amazing vintage jacket on Unirevive for just $15! #secondhand #sustainablefashion</p>
+                                <div className="aspect-square bg-gray-200 rounded-lg overflow-hidden mb-3">
+                                    <img src="https://images.unsplash.com/photo-1551232864-3f0890e580d9?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=500&q=80" className="w-full h-full object-cover" alt="Vintage Jacket" />
+                                </div>
+                                <div className="flex justify-between text-sm text-gray-500">
+                                    <button className="flex items-center space-x-1">
+                                        <i className="far fa-heart"></i>
+                                        <span>42</span>
+                                    </button>
+                                    <button className="flex items-center space-x-1">
+                                        <i className="far fa-comment"></i>
+                                        <span>8</span>
+                                    </button>
+                                    <button className="flex items-center space-x-1">
+                                        <i className="fas fa-share"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Listings Tab Component
+        function ListingsTab({ listings, onUpcycleIdeas }) {
+            return (
+                <div className="p-4">
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-lg font-semibold">Local Listings</h2>
+                        <div className="flex items-center space-x-2">
+                            <button className="p-2 bg-gray-100 rounded-lg">
+                                <i className="fas fa-sliders-h text-gray-600"></i>
+                            </button>
+                            <button className="p-2 bg-gray-100 rounded-lg">
+                                <i className="fas fa-map-marker-alt text-gray-600"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                        {listings.map((listing) => (
+                            <div key={listing.id} className="item-card bg-white rounded-xl overflow-hidden shadow-sm border border-gray-100 transition duration-300">
+                                <div className="aspect-square bg-gray-200 relative">
+                                    <img src={listing.image} className="w-full h-full object-cover" alt={listing.title} />
+                                    <div className="absolute top-2 right-2 bg-white bg-opacity-90 rounded-full p-1.5">
+                                        <i className="fas fa-heart text-gray-400 text-xs"></i>
+                                    </div>
+                                </div>
+                                <div className="p-3">
+                                    <h3 className="font-medium text-sm mb-1">{listing.title}</h3>
+                                    <p className="text-xs text-gray-500 mb-2">{listing.distance}</p>
+                                    <div className="flex justify-between items-center">
+                                        <span className="font-bold text-indigo-600">{listing.price}</span>
+                                        <span className={`text-xs bg-${listing.type === 'Donate' ? 'green' : listing.type === 'Resell' ? 'blue' : 'purple'}-100 text-${listing.type === 'Donate' ? 'green' : listing.type === 'Resell' ? 'blue' : 'purple'}-800 px-2 py-1 rounded-full`}>
+                                            {listing.type}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    
+                    <div className="mt-6 bg-indigo-50 rounded-xl p-4">
+                        <div className="flex items-center space-x-3">
+                            <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center">
+                                <i className="fas fa-lightbulb text-indigo-600"></i>
+                            </div>
+                            <div>
+                                <h3 className="font-medium">Need recycling guidance?</h3>
+                                <p className="text-sm text-gray-600">Ask our AI assistant how to repurpose your old clothes</p>
+                            </div>
+                        </div>
+                        <button onClick={onUpcycleIdeas} className="w-full mt-3 bg-indigo-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-indigo-700">
+                            Get Upcycling Ideas
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        // Rewards Tab Component
+        function RewardsTab({ rewards }) {
+            return (
+                <div className="p-4">
+                    <div className="flex items-center justify-between mb-6">
+                        <div>
+                            <h2 className="text-lg font-semibold">Your Rewards</h2>
+                            <p className="text-sm text-gray-500">Earn points by participating in the circular economy</p>
+                        </div>
+                        <div className="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full font-medium">
+                            1,250 pts
+                        </div>
+                    </div>
+                    
+                    <div className="bg-white rounded-xl shadow-sm p-4 mb-6 border border-gray-100">
+                        <h3 className="font-medium mb-3">Recent Activity</h3>
+                        <div className="space-y-4">
+                            <div className="flex items-start space-x-3">
+                                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mt-1 flex-shrink-0">
+                                    <i className="fas fa-recycle text-green-600"></i>
+                                </div>
+                                <div>
+                                    <p className="font-medium">Recycled 3 items</p>
+                                    <p className="text-sm text-gray-500">2 days ago</p>
+                                    <p className="text-xs text-green-600 mt-1">+150 points</p>
+                                </div>
+                            </div>
+                            
+                            <div className="flex items-start space-x-3">
+                                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mt-1 flex-shrink-0">
+                                    <i className="fas fa-qrcode text-blue-600"></i>
+                                </div>
+                                <div>
+                                    <p className="font-medium">Scanned collection bin</p>
+                                    <p className="text-sm text-gray-500">4 days ago</p>
+                                    <p className="text-xs text-blue-600 mt-1">+50 points</p>
+                                </div>
+                            </div>
+                            
+                            <div className="flex items-start space-x-3">
+                                <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center mt-1 flex-shrink-0">
+                                    <i className="fas fa-share-alt text-purple-600"></i>
+                                </div>
+                                <div>
+                                    <p className="font-medium">Shared on social media</p>
+                                    <p className="text-sm text-gray-500">1 week ago</p>
+                                    <p className="text-xs text-purple-600 mt-1">+30 points</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <h3 className="font-medium mb-3">Available Rewards</h3>
+                    <div className="grid grid-cols-2 gap-3">
+                        {rewards.map((reward) => (
+                            <div key={reward.id} className="bg-white rounded-xl p-3 border border-gray-100">
+                                <div className={`aspect-square bg-${reward.color}-50 rounded-lg mb-2 flex items-center justify-center`}>
+                                    <i className={`fas ${reward.icon} text-${reward.color}-500 text-2xl`}></i>
+                                </div>
+                                <h4 className="font-medium text-sm mb-1">{reward.title}</h4>
+                                <p className="text-xs text-gray-500 mb-2">{reward.description}</p>
+                                <button className={`w-full bg-${reward.color}-100 text-${reward.color}-800 text-xs py-1.5 rounded-lg font-medium`}>
+                                    {reward.points}
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                    
+                    <div className="mt-6 bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+                        <h3 className="font-medium mb-3">How to Earn More Points</h3>
+                        <div className="space-y-3">
+                            <div className="flex items-center space-x-3">
+                                <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                    <i className="fas fa-recycle text-green-600 text-sm"></i>
+                                </div>
+                                <p className="text-sm">Recycle clothes: <span className="font-medium">50 pts/item</span></p>
+                            </div>
+                            <div className="flex items-center space-x-3">
+                                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                    <i className="fas fa-qrcode text-blue-600 text-sm"></i>
+                                </div>
+                                <p className="text-sm">Scan QR codes: <span className="font-medium">50 pts/scan</span></p>
+                            </div>
+                            <div className="flex items-center space-x-3">
+                                <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                    <i className="fas fa-share-alt text-purple-600 text-sm"></i>
+                                </div>
+                                <p className="text-sm">Share on social: <span className="font-medium">30 pts/post</span></p>
+                            </div>
+                            <div className="flex items-center space-x-3">
+                                <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                    <i className="fas fa-comment text-yellow-600 text-sm"></i>
+                                </div>
+                                <p className="text-sm">Refer friends: <span className="font-medium">100 pts/friend</span></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Bottom Navigation Component
+        function BottomNavigation({ activeTab, onTabChange }) {
+            return (
+                <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 max-w-md mx-auto flex justify-around py-2">
+                    <button 
+                        onClick={() => onTabChange('home')} 
+                        className={`flex flex-col items-center p-2 ${activeTab === 'home' ? 'text-indigo-600' : 'text-gray-500'}`}
+                    >
+                        <i className={`fas fa-home ${activeTab === 'home' ? 'text-indigo-600' : 'text-gray-500'} mb-1`}></i>
+                        <span className="text-xs">Home</span>
+                    </button>
+                    <button 
+                        onClick={() => onTabChange('listings')} 
+                        className={`flex flex-col items-center p-2 ${activeTab === 'listings' ? 'text-indigo-600' : 'text-gray-500'}`}
+                    >
+                        <i className={`fas fa-tshirt ${activeTab === 'listings' ? 'text-indigo-600' : 'text-gray-500'} mb-1`}></i>
+                        <span className="text-xs">Listings</span>
+                    </button>
+                    <button 
+                        onClick={() => onTabChange('rewards')} 
+                        className={`flex flex-col items-center p-2 ${activeTab === 'rewards' ? 'text-indigo-600' : 'text-gray-500'}`}
+                    >
+                        <i className={`fas fa-gem ${activeTab === 'rewards' ? 'text-indigo-600' : 'text-gray-500'} mb-1`}></i>
+                        <span className="text-xs">Rewards</span>
+                    </button>
+                </nav>
+            );
+        }
+
+        // Auth Modal Component
+        function AuthModal({ show, mode, onClose, onSwitchMode }) {
+            if (!show) return null;
+            
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+                    <div className="bg-white rounded-xl p-8 w-full max-w-md">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-2xl font-bold text-gray-800">Welcome to Unirevive</h2>
+                            <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+                                <i className="fas fa-times"></i>
+                            </button>
+                        </div>
+                        
+                        <div className="space-y-4">
+                            <button className="w-full flex items-center justify-center gap-2 bg-white border border-gray-300 rounded-lg py-3 px-4 text-gray-700 font-medium hover:bg-gray-50">
+                                <i className="fab fa-google text-red-500"></i>
+                                Continue with Google
+                            </button>
+                            
+                            <button className="w-full flex items-center justify-center gap-2 bg-black text-white rounded-lg py-3 px-4 font-medium hover:bg-gray-800">
+                                <i className="fab fa-apple"></i>
+                                Continue with Apple
+                            </button>
+                            
+                            <div className="relative flex items-center my-6">
+                                <div className="flex-grow border-t border-gray-300"></div>
+                                <span className="flex-shrink mx-4 text-gray-500">or</span>
+                                <div className="flex-grow border-t border-gray-300"></div>
+                            </div>
+                            
+                            {mode === 'signin' ? (
+                                <div id="emailAuth">
+                                    <div className="mb-4">
+                                        <label htmlFor="authEmail" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                                        <input type="email" id="authEmail" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
+                                    </div>
+                                    <div className="mb-4">
+                                        <label htmlFor="authPassword" className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                                        <input type="password" id="authPassword" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
+                                    </div>
+                                    <button className="w-full bg-indigo-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-indigo-700 mb-2">
+                                        Sign In
+                                    </button>
+                                    <p className="text-center text-sm text-gray-600">
+                                        Don't have an account? <button onClick={onSwitchMode} className="text-indigo-600 hover:underline">Sign up</button>
+                                    </p>
+                                </div>
+                            ) : (
+                                <div id="emailSignUp">
+                                    <div className="mb-4">
+                                        <label htmlFor="signupName" className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                                        <input type="text" id="signupName" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
+                                    </div>
+                                    <div className="mb-4">
+                                        <label htmlFor="signupEmail" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                                        <input type="email" id="signupEmail" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
+                                    </div>
+                                    <div className="mb-4">
+                                        <label htmlFor="signupPassword" className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                                        <input type="password" id="signupPassword" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
+                                    </div>
+                                    <div className="mb-4">
+                                        <label htmlFor="signupConfirmPassword" className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
+                                        <input type="password" id="signupConfirmPassword" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
+                                    </div>
+                                    <div className="mb-4">
+                                        <label className="inline-flex items-center">
+                                            <input type="checkbox" className="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" />
+                                            <span className="ml-2 text-sm text-gray-600">I agree to the <a href="#" className="text-indigo-600 hover:underline">Terms of Service</a> and <a href="#" className="text-indigo-600 hover:underline">Privacy Policy</a></span>
+                                        </label>
+                                    </div>
+                                    <button className="w-full bg-indigo-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-indigo-700 mb-2">
+                                        Create Account
+                                    </button>
+                                    <p className="text-center text-sm text-gray-600">
+                                        Already have an account? <button onClick={onSwitchMode} className="text-indigo-600 hover:underline">Sign in</button>
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // QR Scanner Modal Component
+        function QrScannerModal({ show, onClose }) {
+            if (!show) return null;
+            
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+                    <div className="bg-white rounded-xl p-6 w-full max-w-md">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-xl font-bold">Scan QR Code</h2>
+                            <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+                                <i className="fas fa-times"></i>
+                            </button>
+                        </div>
+                        
+                        <div className="bg-black rounded-lg overflow-hidden mb-4" style={{ height: '300px' }}>
+                            <div className="w-full h-full flex items-center justify-center text-white">
+                                <div className="text-center">
+                                    <i className="fas fa-qrcode text-6xl mb-4"></i>
+                                    <p>QR Scanner would appear here</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <p className="text-sm text-gray-600 mb-4">Scan a QR code on a collection bin or soft playground to earn rewards and track your impact.</p>
+                        
+                        <button className="w-full bg-gray-100 text-gray-800 py-3 px-4 rounded-lg font-medium hover:bg-gray-200">
+                            <i className="fas fa-keyboard mr-2"></i> Enter Code Manually
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        // Upcycling Modal Component
+        function UpcyclingModal({ show, showResults, onClose, onGenerateIdeas }) {
+            if (!show) return null;
+            
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+                    <div className="bg-white rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-xl font-bold">Upcycling Ideas</h2>
+                            <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+                                <i className="fas fa-times"></i>
+                            </button>
+                        </div>
+                        
+                        {!showResults ? (
+                            <>
+                                <div className="mb-4">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">What item would you like to repurpose?</label>
+                                    <textarea className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" rows="3" placeholder="Describe the item you want to upcycle (e.g. old jeans, t-shirt with stains, wool sweater)"></textarea>
+                                </div>
+                                
+                                <div className="mb-4">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Or upload a photo</label>
+                                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                                        <i className="fas fa-camera text-gray-400 text-2xl mb-2"></i>
+                                        <p className="text-sm text-gray-500">Drag & drop photo or click to browse</p>
+                                        <input type="file" className="hidden" id="upcyclingPhoto" />
+                                    </div>
+                                </div>
+                                
+                                <button onClick={onGenerateIdeas} className="w-full bg-indigo-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-indigo-700 mb-4">
+                                    <i className="fas fa-lightbulb mr-2"></i> Generate Ideas
+                                </button>
+                            </>
+                        ) : (
+                            <div>
+                                <h3 className="font-medium mb-2">Upcycling Ideas</h3>
+                                <div className="bg-indigo-50 rounded-lg p-4 mb-3">
+                                    <h4 className="font-medium text-indigo-800 mb-1">Denim Tote Bag</h4>
+                                    <p className="text-sm text-gray-700">Turn old jeans into a stylish tote bag by cutting the legs into panels and sewing them together with the waistband as handles.</p>
+                                </div>
+                                <div className="bg-indigo-50 rounded-lg p-4 mb-3">
+                                    <h4 className="font-medium text-indigo-800 mb-1">Quilted Blanket</h4>
+                                    <p className="text-sm text-gray-700">Combine denim with other fabric scraps to create a cozy, textured quilt perfect for picnics or home decor.</p>
+                                </div>
+                                <div className="bg-indigo-50 rounded-lg p-4">
+                                    <h4 className="font-medium text-indigo-800 mb-1">Plant Holders</h4>
+                                    <p className="text-sm text-gray-700">Cut the legs into sections to make hanging plant holders or use the pockets to create small plant pouches.</p>
+                                </div>
+                                
+                                <button onClick={onClose} className="w-full mt-4 bg-indigo-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-indigo-700">
+                                    Close
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        // Add Listing Modal Component
+        function AddListingModal({ show, disposition, onClose, onDispositionSelect }) {
+            if (!show) return null;
+            
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+                    <div className="bg-white rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-xl font-bold">Add New Listing</h2>
+                            <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+                                <i className="fas fa-times"></i>
+                            </button>
+                        </div>
+                        
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Upload Photos</label>
+                                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                                    <i className="fas fa-camera text-gray-400 text-2xl mb-2"></i>
+                                    <p className="text-sm text-gray-500">Drag & drop photos or click to browse</p>
+                                    <input type="file" className="hidden" id="listingPhotos" multiple />
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label htmlFor="itemTitle" className="block text-sm font-medium text-gray-700 mb-1">Item Title</label>
+                                <input type="text" id="itemTitle" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="e.g. Vintage Denim Jacket" />
+                            </div>
+                            
+                            <div>
+                                <label htmlFor="itemCategory" className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                                <select id="itemCategory" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                    <option value="">Select category</option>
+                                    <option value="tops">Tops</option>
+                                    <option value="bottoms">Bottoms</option>
+                                    <option value="dresses">Dresses</option>
+                                    <option value="outerwear">Outerwear</option>
+                                    <option value="accessories">Accessories</option>
+                                    <option value="shoes">Shoes</option>
+                                    <option value="bags">Bags</option>
+                                    <option value="jewelry">Jewelry</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label htmlFor="itemCondition" className="block text-sm font-medium text-gray-700 mb-1">Condition</label>
+                                <select id="itemCondition" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                    <option value="">Select condition</option>
+                                    <option value="new">New with tags</option>
+                                    <option value="excellent">Excellent</option>
+                                    <option value="good">Good</option>
+                                    <option value="fair">Fair</option>
+                                    <option value="poor">Poor (for recycling)</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Disposition</label>
+                                <div className="grid grid-cols-3 gap-2">
+                                    <button 
+                                        onClick={() => onDispositionSelect('sell')}
+                                        className={`py-2 px-3 border rounded-lg font-medium ${disposition === 'sell' ? 'bg-indigo-100 border-indigo-300 text-indigo-700' : ''}`}
+                                    >
+                                        <i className="fas fa-tag mr-1"></i> Sell
+                                    </button>
+                                    <button 
+                                        onClick={() => onDispositionSelect('donate')}
+                                        className={`py-2 px-3 border rounded-lg font-medium ${disposition === 'donate' ? 'bg-indigo-100 border-indigo-300 text-indigo-700' : ''}`}
+                                    >
+                                        <i className="fas fa-hand-holding-heart mr-1"></i> Donate
+                                    </button>
+                                    <button 
+                                        onClick={() => onDispositionSelect('recycle')}
+                                        className={`py-2 px-3 border rounded-lg font-medium ${disposition === 'recycle' ? 'bg-indigo-100 border-indigo-300 text-indigo-700' : ''}`}
+                                    >
+                                        <i className="fas fa-recycle mr-1"></i> Recycle
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            {disposition === 'sell' && (
+                                <div id="priceField">
+                                    <label htmlFor="itemPrice" className="block text-sm font-medium text-gray-700 mb-1">Price ($)</label>
+                                    <input type="number" id="itemPrice" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="0.00" />
+                                </div>
+                            )}
+                            
+                            <div>
+                                <label htmlFor="itemDescription" className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                                <textarea id="itemDescription" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" rows="3" placeholder="Tell potential buyers about your item..."></textarea>
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Options</label>
+                                <div className="space-y-2">
+                                    <label className="flex items-center space-x-2">
+                                        <input type="radio" name="delivery" value="local" className="text-indigo-600" checked />
+                                        <span>Local pickup (free)</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2">
+                                        <input type="radio" name="delivery" value="shipping" className="text-indigo-600" />
+                                        <span>Shipping (buyer pays)</span>
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div className="map-container bg-gray-200 rounded-lg mb-4">
+                                <div className="w-full h-full flex items-center justify-center">
+                                    <div className="text-center">
+                                        <i className="fas fa-map-marker-alt text-4xl text-gray-500 mb-2"></i>
+                                        <p className="text-gray-600">Map would show your location</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button className="w-full bg-indigo-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-indigo-700">
+                                Submit Listing
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Brand Dashboard Modal Component
+        function BrandDashboardModal({ show, onClose }) {
+            if (!show) return null;
+            
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+                    <div className="bg-white rounded-xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+                        <div className="flex justify-between items-center mb-6">
+                            <div>
+                                <h2 className="text-xl font-bold">EPR Dashboard</h2>
+                                <p className="text-sm text-gray-500">Extended Producer Responsibility Tracking</p>
+                            </div>
+                            <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+                                <i className="fas fa-times"></i>
+                            </button>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                                <div className="bg-indigo-50 rounded-xl p-4">
+                                    <p className="text-sm text-indigo-700 mb-1">Items Collected</p>
+                                    <h3 className="text-2xl font-bold text-indigo-900">1,842</h3>
+                                    <p className="text-xs text-indigo-600">+12% from last quarter</p>
+                                </div>
+                                <div className="bg-green-50 rounded-xl p-4">
+                                    <p className="text-sm text-green-700 mb-1">Recycling Rate</p>
+                                    <h3 className="text-2xl font-bold text-green-900">78%</h3>
+                                    <p className="text-xs text-green-600">5% above industry average</p>
+                                </div>
+                                <div className="bg-purple-50 rounded-xl p-4">
+                                    <p className="text-sm text-purple-700 mb-1">EPR Compliance</p>
+                                    <h3 className="text-2xl font-bold text-purple-900">92/100</h3>
+                                    <p className="text-xs text-purple-600">Excellent rating</p>
+                                </div>
+                            </div>
+                            
+                            <div className="bg-white rounded-xl shadow-sm p-4 mb-6 border border-gray-100">
+                                <h3 className="font-medium mb-3">Collection by Category</h3>
+                                <div className="h-40">
+                                    <div className="w-full h-full flex items-center justify-center bg-gray-50 rounded-lg">
+                                        <p className="text-gray-500">Collection data visualization would appear here</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+                                    <h3 className="font-medium mb-3">Recent Collections</h3>
+                                    <div className="space-y-3">
+                                        <div className="flex items-center space-x-3">
+                                            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                                <i className="fas fa-tshirt text-blue-600"></i>
+                                            </div>
+                                            <div>
+                                                <p className="font-medium">Denim Collection</p>
+                                                <p className="text-sm text-gray-500">42 items collected</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center space-x-3">
+                                            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                                                <i className="fas fa-socks text-green-600"></i>
+                                            </div>
+                                            <div>
+                                                <p className="font-medium">Activewear Drive</p>
+                                                <p className="text-sm text-gray-500">28 items collected</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+                                    <h3 className="font-medium mb-3">QR Bin Activity</h3>
+                                    <div className="space-y-3">
+                                        <div className="flex items-center space-x-3">
+                                            <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                                                <i className="fas fa-qrcode text-purple-600"></i>
+                                            </div>
+                                            <div>
+                                                <p className="font-medium">Downtown Bin</p>
+                                                <p className="text-sm text-gray-500">Scanned 124 times</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center space-x-3">
+                                            <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
+                                                <i className="fas fa-store text-yellow-600"></i>
+                                            </div>
+                                            <div>
+                                                <p className="font-medium">Mall Collection</p>
+                                                <p className="text-sm text-gray-500">Scanned 87 times</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button className="w-full bg-indigo-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-indigo-700">
+                                <i className="fas fa-download mr-2"></i> Download EPR Report
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            // Playground Modal Component
+            function PlaygroundModal({ show, playgrounds, onClose }) {
+                if (!show) return null;
+                
+                return (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+                        <div className="bg-white rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+                            <div className="flex justify-between items-center mb-6">
+                                <div>
+                                    <h2 className="text-xl font-bold">Soft Playgrounds</h2>
+                                    <p className="text-sm text-gray-500">Made from upcycled materials</p>
+                                </div>
+                                <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+                                    <i className="fas fa-times"></i>
+                                </button>
+                            </div>
+                            
+                            <div className="map-container bg-gray-200 rounded-lg mb-4">
+                                <div className="w-full h-full flex items-center justify-center">
+                                    <div className="text-center">
+                                        <i className="fas fa-map-marked-alt text-4xl text-gray-500 mb-2"></i>
+                                        <p className="text-gray-600">Map would show nearby playgrounds</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="space-y-4">
+                                {playgrounds.map((playground) => (
+                                    <div key={playground.id} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
+                                        <div className="w-16 h-16 bg-purple-100 rounded-lg flex-shrink-0 overflow-hidden">
+                                            <img src={playground.image} className="w-full h-full object-cover" alt={playground.name} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-medium">{playground.name}</h3>
+                                            <p className="text-sm text-gray-600 mb-1">{playground.distance}</p>
+                                            <p className="text-xs text-gray-500">Materials: {playground.materials}</p>
+                                            <div className="flex items-center mt-2">
+                                                <i className="fas fa-star text-yellow-400 text-xs mr-1"></i>
+                                                <span className="text-xs font-medium">{playground.rating}</span>
+                                                <span className="mx-1 text-gray-300">•</span>
+                                                <span className="text-xs text-gray-500">{playground.reviews}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            
+                            <button className="w-full mt-4 bg-indigo-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-indigo-700">
+                                <i className="fas fa-map-marker-alt mr-2"></i> View All on Map
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            // Render the app
+            const root = ReactDOM.createRoot(document.getElementById('root'));
+            root.render(<App />);
+    </script>
+</body>
+</html>
